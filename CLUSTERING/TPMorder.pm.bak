@@ -1,0 +1,284 @@
+package TPMorder;
+
+use ord_sub;
+use strict;
+
+################################################################
+# 							       #
+#  Name: Transition Probability Matrix[TPM] Calculation        #
+#  Copyright: MSB Pvt.Ltd.				       #
+#  Author: Manojkumar S. Bhosale			       #
+#  Date: 03/02/11 17:54					       #
+#  							       #
+#							       #
+#  Description: 					       #
+#							       #
+#	 METHODS in THE package				       #
+#							       #
+# 		new					       #
+# 		file_process				       #
+# 		TPM_main				       #
+# 		distance_matrix				       #
+# 		neighbor				       #
+#							       #
+################################################################
+
+sub new
+{
+	
+	my $self={};
+	shift;
+	$self->{"ATGC"} =["A","T","G","C"]; 
+	
+	bless($self);
+	
+	return $self;	
+	
+}
+
+sub file_process
+{
+	my $self = shift;
+	my $file_name = shift;
+	$self->{"file_name"}=$file_name;	
+	open IN,"$file_name" or die("\nFailed To Open The File \n$! !!!!!!!!!!!!!!\n");
+		    	
+			my $header=();
+			while(<IN>)
+			{
+				chomp;
+				
+				if($_=~m/^>/)
+				{
+					$header = $_;
+					$header=~s/\s+//;$header=~s/>//;
+					$header = substr($header,0,10);
+					my $space = 10-length $header;
+	
+					if($space != 0)
+					{
+						for(my $i = 0; $i<$space ;$i++)
+						{
+							$header .=" " ;
+						}
+					}
+					
+					$self->{"seq_hash"}->{$header};
+					
+				}
+				elsif($_=~m/[ATGC]/g)
+				{
+						$self->{"seq_hash"}->{$header}.=$_;
+				}
+				else{}
+		
+			}
+			
+		return $self->{"seq_hash"};
+
+} #END OF THE FILE PROCESS SUB
+	
+	
+sub TPM_main
+{
+	my $self = shift;
+	my $order = shift;
+	$self->{"order"} = $order; 
+	my %mono_nuc=();
+	my $arr_ref=();
+	
+	if($order == 1)
+	{
+		$arr_ref = ord_sub->ord_1_combination();
+	}
+	elsif($order == 2)
+	{
+		$arr_ref = ord_sub->ord_2_combination();
+	}
+	elsif($order == 3)
+	{
+		$arr_ref = ord_sub->ord_3_combination();
+	}
+	elsif($order == 4)
+	{
+		$arr_ref = ord_sub->ord_4_combination();
+	}
+	elsif($order == 5)
+	{
+		$arr_ref = ord_sub->ord_5_combination();
+	}
+	elsif($order == 6)
+	{
+		$arr_ref = ord_sub->ord_6_combination();
+	}
+	elsif($order == 7)
+	{
+		$arr_ref = ord_sub->ord_7_combination();
+	}
+	elsif($order == 8)
+	{
+		$arr_ref = ord_sub->ord_8_combination();
+	}
+	
+	$self->{"combi_array"} = $arr_ref; 
+	
+	my $assi_ind=0;
+	for(my $i = 0; $i < 4; $i++)
+		{
+					$self->{"mono_nuc"}->{$self->{"ATGC"}[$i]}=$assi_ind;
+					$assi_ind++;	
+		}
+		
+		
+		
+		
+		foreach my $header (keys %{$self->{"seq_hash"}})
+		{
+		
+			for(my $i = 0;$i< scalar(@{$arr_ref});$i++)
+			{
+				colsum_row_sum($arr_ref,$self,\$header,$i,\$self->{"seq_hash"}->{$header});
+			}
+
+		}	
+
+
+	return $self->{"dist_master"};
+} # END OF TPM_MAIN
+ 	
+	
+sub colsum_row_sum
+{
+	my $arr_ref = shift;
+	my $self=shift;
+	my $header =shift;
+	my $di_num = shift;
+	my $ref_file = shift;
+	my (@temp_row,@TPMrow,@rowsum)=();
+			
+while ($$ref_file =~ m/(?=(${$arr_ref}[$di_num])(.))/g)
+	{
+ 	                $temp_row[$self->{"mono_nuc"}->{$2}]++;
+        }
+
+	my $ind=0;	
+	
+foreach(@{$self->{"ATGC"}})
+	{
+		$rowsum[$di_num]+=$temp_row[$ind];
+		$ind++;
+	}	
+	
+	 $ind=0;	
+
+foreach(@{$self->{"ATGC"}})
+	{
+		if($rowsum[$di_num] != 0)
+		{
+			$TPMrow[$ind]=$temp_row[$ind]/$rowsum[$di_num];	
+		}
+		else
+		{
+			$TPMrow[$ind]=0;
+		}
+			
+			$ind++;
+	}	
+push(@{$self->{"dist_master"}->{$$header}->{${$arr_ref}[$di_num]}},@TPMrow);
+
+	@temp_row=();
+	@TPMrow=();
+	
+} # colsum_rowsum subroutine ends here
+
+
+
+sub distance_matrix
+{
+	
+	my $self = shift;
+	my @mat_id = ();
+	my $ke = keys %{$self->{"dist_master"}};
+	my @mat_id = keys %{$self->{"dist_master"}};
+		
+my $k=0;
+
+
+
+my $sq_sub = ();
+my $distance = 0;
+
+open OUT,">DISTANCE_MATRIX.txt";
+
+print OUT "    $ke\n";
+
+for(my $j = 0 ; $j < scalar(@mat_id) ; $j++)
+{
+print OUT "$mat_id[$j]  ";
+	for(my $i = 0 ; $i < scalar(@mat_id) ; $i++)
+	{
+		foreach(@{$self->{"combi_array"}})
+		{
+			for(my $l = 0 ; $l < 4 ; $l++ )
+			{
+				$sq_sub += (${$self->{"dist_master"}->{$mat_id[$j]}->{$_}}[$l]-${$self->{"dist_master"}->{$mat_id[$i]}->{$_}}[$l])**2;
+			}
+			
+		}
+		
+		$distance = sqrt($sq_sub);
+		printf OUT "%.3f  ",$distance;
+		$sq_sub=0;
+		$distance=0;
+		
+	}
+	
+	print OUT "\n";
+}
+
+close(OUT);	
+
+
+
+}
+
+
+
+sub neighbor
+{
+	my $self = shift;
+	my $order = $self->{"order"};
+	my $file_name = $self->{"file_name"};
+	$file_name=~s/.*\\//g;
+	$file_name=~s/INPUT\_FILES\///g
+	$file_name=~s/\.txt//g;
+	$file_name=~s/\.fasta//g;
+	#mkdir("$order--$file_name");
+	system "mkdir RESULTS";
+	#system "echo off";
+	system "COPY /Y DISTANCE_MATRIX.txt infile >inp.txt";
+	#system 'echo y|neighbor.exe';
+	open(OUT, ">inp.txt");
+	print OUT "N\nJ\n3\nY\n";
+	system 'type inp.txt | neighbor.exe >one.txt';
+
+	#`type inp.txt | neighbor`;
+	#rename("infile", "$order-inFILE_$file_name");
+	#rename("outfile", "$order-outFILE_$file_name");
+	#rename("outtree", "$order-outTREE_$file_name");
+
+	system "rename infile $order-inFILE-$file_name";
+	system "rename outfile $order-outFILE-$file_name";
+	system "rename outtree $order-outTREE-$file_name.dnd";
+
+	#system "MOVE /Y $order-inFILE_$file_name $order--$file_name";
+	#system "MOVE /Y $order-outFILE_$file_name $order--$file_name";
+	#system "MOVE /Y $order-outTREE_$file_name $order--$file_name";
+	system "MOVE  /Y $order-inFILE-$file_name RESULTS >one.txt";
+	system "MOVE  /Y $order-outFILE-$file_name RESULTS >one.txt";
+	system "MOVE  /Y $order-outTREE-$file_name.dnd RESULTS >one.txt";
+}
+
+
+
+1;
